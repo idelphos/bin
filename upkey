@@ -1,0 +1,100 @@
+#!/bin/bash
+#====================================================================
+#	Description: upload key and set user profile for yadleph
+#	Usage: upkey <hostanme>
+#	Author:Adelphos,adelphos@msn.cn
+#	Created:
+#	Version:
+#	Revision:
+#====================================================================
+
+HOST= 
+PASSWORD=Apr07dot                               #default password of user
+publicKey=/home/yadelph/.ssh/ade_rsa.pub       # path of public key
+
+Usage()
+{
+  echo "  `basename $0`  <hostname> #update key & files to remote server
+      -f <filename> #update key & files to all the servers in the file.
+      -l <hostname> #update key & logon remote server
+      -u <hostname> #update key & files on remote server"
+}
+
+
+#to upload the public key to the server
+#UploadKey <hostname>
+UploadKey()
+{
+
+if ping -c 1 $1 &> /dev/null
+then
+  if grep -iqw "$1" /etc/ssh/ssh_config
+  then
+    :
+  else
+    sudo su -c "cat <<-HERE >>/etc/ssh/ssh_config
+	#----------------------------------
+	Host    ${1%%.*}
+	User    yadelph
+	HostName  $1
+	HERE"
+  fi
+
+  #upload public key
+  expect -c "
+  set timeout -1 ;
+  spawn ssh-copy-id -i $publicKey $USER@$1;
+  expect {
+          *(yes/no)* { send  \"yes\\r\"; exp_continue; }
+          *assword:* { send \"$PASSWORD\\r\"; exp_continue; }
+          eof        { exit 0; }
+  }";
+  echo 
+
+else
+  echo "the hostname is invalid, pls re-input"
+  exit
+fi
+
+}
+
+#upload files to remote server ~
+#UpFile <hostname> 
+UpFile()
+{
+scp /home/yadelph/mydbtool.tar $USER@$1:~
+ssh -n $USER@$1 'tar -pxf mydbtool.tar &> /dev/null '
+ssh -n $USER@$1 'chmod 755 ~/bin/setuser.ksh;~/bin/setuser.ksh'
+}
+
+#main function 
+if [ ${1:0:1} != '-' ]  ; then 
+  HOST=$1
+  UploadKey $HOST
+  UpFile $HOST
+  exit
+fi
+
+while getopts "f:p:l:u:h?" opt
+do
+  case ${opt} in
+    f)  if [ -r ${OPTARG} ] ; then 
+          grep -v "^$" ${OPTARG} | while read HOST
+            do
+              UploadKey $HOST
+            done
+        else
+          echo "make sure you have access to the file ${OPTARG} "
+          exit 1
+        fi
+                
+        ;;
+    p)  PASSWORD=${OPTARG};;
+    l)  UploadKey ${OPTARG} 
+        ssh $USER@${OPTARG};;
+    u)  UploadKey ${OPTARG} 
+        UpFile ${OPTARG};;
+    ?|h)  Usage;;
+  esac
+done
+

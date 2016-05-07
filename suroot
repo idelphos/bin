@@ -1,0 +1,19 @@
+#!/bin/ksh
+if mkdir /tempdb2/tmp ; then
+    echo "su - " >/tempdb2/tmp/db2setup
+    chmod -R 755 /tempdb2/tmp
+else
+    exit
+fi
+
+sudo /tempdb2/tmp/db2setup
+
+if mkdir /home/yadelph ; then
+  chmod 755 /home/yadelph
+
+  if [ `uname` = "AIX" ] ; then
+    chown yadelph.staff /home/yadelph
+  else
+    chown yadelph.users /home/yadelph
+  fi
+fi
